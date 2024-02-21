@@ -6,15 +6,15 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 const registerUser = asyncHandler( async (req, res) => {
     
-    const {fullName, username, email, pasword} = req.body
+    const {fullName, username, email, password} = req.body
     
     if(
-        [fullName, email, username, pasword].some((field)=> field?.trim() === "")
+        [fullName, email, username, password].some((field)=> field?.trim() === "")
     ){
         throw new ApiError(400, " All the fileds are required")
     }
 
-    const existedUser = User.findOne({
+    const existedUser =  await User.findOne({
         $or: [{ email }, { username }]
     })
 
@@ -23,7 +23,11 @@ const registerUser = asyncHandler( async (req, res) => {
     }
 
     const avatarLocalPath = req.files?.avatar[0]?.path
-    const coverImageLocalPath = req.files?.coverImage[0]?.path
+    // const coverImageLocalPath = req.files?.coverImage[0]?.path
+    let coverImageLocalPath;
+    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0){
+        coverImageLocalPath = req.files?.coverImage[0]?.path;
+    }
 
     if(!avatarLocalPath){
         throw new ApiError(400,"Avatar file is required" )
@@ -41,7 +45,7 @@ const registerUser = asyncHandler( async (req, res) => {
         avatar: avatar.url,
         email,
         coverImage: coverImage?.url || "",
-        pasword,
+        password,
         username: username.toLowerCase()
     })
 
