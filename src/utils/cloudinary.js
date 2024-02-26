@@ -1,6 +1,7 @@
 import {v2 as cloudinary} from 'cloudinary'
-import { log } from 'console';
+
 import fs from 'fs'
+import { ApiError } from './ApiError';
 
           
 cloudinary.config({ 
@@ -16,7 +17,7 @@ const uploadOnCloudinary=async(localFilePath)=>{
         // upload the file on cloudinary
         const response=await cloudinary.uploader.upload(localFilePath, {
             resource_type:"auto"
-        })
+        })        
         // file has been uploaded sucesfully
         // console.log("file has been uploaded succesfully" , response.url);
         fs.unlinkSync(localFilePath)
@@ -28,4 +29,18 @@ const uploadOnCloudinary=async(localFilePath)=>{
     }
 }
 
-export {uploadOnCloudinary}
+const deleteFromCloudinary = async(cloudinaryId)=>{
+    try {
+        
+        if(!cloudinaryId){
+            throw new ApiError(401, "unable to reach file url")
+        }
+        await cloudinary.uploader.destroy(cloudinaryId)
+
+    
+    } catch (error) {
+        throw new ApiError(404, "Can't delete file")
+    }
+}
+
+export {uploadOnCloudinary, deleteFromCloudinary}
