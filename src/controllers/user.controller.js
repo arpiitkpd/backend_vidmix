@@ -25,7 +25,7 @@ const generateAccessandRefreshToken = async(userId)=>{
 const registerUser = asyncHandler( async (req, res) => {
     
     const {fullName, username, email, password} = req.body
-    
+    console.log(fullName, username)
     if(
         [fullName, email, username, password].some((field)=> field?.trim() === "")
     ){
@@ -82,39 +82,46 @@ const registerUser = asyncHandler( async (req, res) => {
 
 })
 
-const loginUser = asyncHandler(async (req, res)=>{
-    // req bosy - data
+const loginUser = asyncHandler(async (req, res) =>{
+    // req body -> data
     // username or email
-    // find the user
-    // password check
-    // access and refresh token renegration
-    // send cookies
+    //find the user
+    //password check
+    //access and referesh token
+    //send cookie
 
-    const {email, username, password}= req.body;
+    const {email, username, password} = req.body
+   
 
-    if(!(username || email)){
-        throw new ApiError(404, "username and pasword is required")
+    if (!username && !email) {
+        throw new ApiError(400, "username or email is required")
     }
+    
+    // Here is an alternative of above code based on logic discussed in video:
+    // if (!(username || email)) {
+    //     throw new ApiError(400, "username or email is required")
+        
+    // }
 
     const user = await User.findOne({
-        $or:[{email}, {username}]
+        $or: [{username}, {email}]
     })
-    if(!user){
-        throw new ApiError(404, "User not exist")
 
+    if (!user) {
+        throw new ApiError(404, "User does not exist")
     }
 
-    const isPasswordValid = await user.isPasswordCorrect(password)
+   const isPasswordValid = await user.isPasswordCorrect(password)
 
-    if(!isPasswordValid){
-        throw new ApiError(401, "Invalid User credentials")
+   if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid user credentials")
     }
 
-    const {accessToken, refreshToken} = await generateAccessandRefreshToken(user._id)
+   const {accessToken, refreshToken} = await generateAccessandRefreshToken(user._id)
 
-    const loggedInUser = User.findById(user._id).select("-password -refreshToken")
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
-    const options ={
+    const options = {
         httpOnly: true,
         secure: true
     }
@@ -124,11 +131,17 @@ const loginUser = asyncHandler(async (req, res)=>{
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
     .json(
-        new ApiResponse(200,{
-            user: loggedInUser, accessToken, refreshToken
-        }, "User logged in Succesfully")
+        new ApiResponse(
+            200, 
+            {
+                user: loggedInUser, accessToken, refreshToken
+            },
+            "User logged In Successfully"
+        )
     )
+
 })
+
 
 const logoutUser = asyncHandler(async (req, res)=>{
      await User.findByIdAndUpdate(
@@ -149,8 +162,8 @@ const logoutUser = asyncHandler(async (req, res)=>{
 
     return res
     .status(200)
-    .clearCookie(refreshToken, options)
-    .clearCookie(accessToken, options)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
     .json(
         new ApiResponse(200, {}, "user logged out")
     )
@@ -225,6 +238,7 @@ const getCurrentUser = asyncHandler(async(req, res)=>{
 
 const updateAccountDetails = asyncHandler(async(req, res)=>{
     const {fullName, email} = req.body
+    console.log(fullName)
 
     if(!fullName || ! email){
         throw new ApiError(400, "All the fileds are required")
@@ -452,5 +466,6 @@ export {
     updateUserAvatar,
     updateUserCoverImage,
     getUserChannelProfile,
-    getWatchHistory
+    getWatchHistory,
+    
 }
