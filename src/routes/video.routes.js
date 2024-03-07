@@ -5,16 +5,17 @@ import { deleteVideo, getAllVideos, getVideoById, publishAVideo, tooglePublishSt
 
 const router = Router()
 
-router.route("/publish-video").post(verifyJWT,upload.fields([
-    {
-        name: "thumbnail",
-        maxCount:1
-    },
-    {
-        name: "videoFile",
-        maxCount:1
-    }
-]), 
+router.route("/publish-video").post(
+    upload.fields([
+        {
+            name: "thumbnail",
+            maxCount: 1
+        },
+        {
+            name: "video",
+            maxCount: 1
+        }
+    ]),
  publishAVideo
 )
 

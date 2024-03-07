@@ -9,14 +9,12 @@ const publishAVideo = asyncHandler(async(req, res)=>{
 
         const{title, description} = req.body;
     
-        if(
-            [title, description ].some((field)=> field?.trim() === "")
-        ){
+        if( [title, description ].some((field)=> field?.trim() === "")){
             throw new ApiError(400, " All the fileds are required")
         }
         
         // thumbnail and video
-        const thumbnailLocalPath = req.files?.video[0]?.path
+        const thumbnailLocalPath = req.files?.thumbnail[0]?.path
         const videoLocalPath = req.files?.video[0]?.path
 
         if(!thumbnailLocalPath){
@@ -42,7 +40,7 @@ const publishAVideo = asyncHandler(async(req, res)=>{
             description: description,
             thumbnail: publishThumbnail.url,
             videoFile: publishVideo.url,
-            duration: 5,
+            duration: publishVideo.duration,
             views: 0,
             isPublished: true,
             owner: req.user._id
@@ -181,52 +179,76 @@ const tooglePublishStatus = asyncHandler(async(req, res)=>{
 })
 
 const getAllVideos = asyncHandler(async(req, res)=>{
-    const {page=1, limit=2, query="", sortBy="title", sortType="ascending", userId} = req.query
+    let {page=1, limit=10, query, sortBy, sortType, userId} = req.query;
 
-    if(query==""){
-        const videos = await Video.find({owner: userId})
-        return res.status(200).json(new ApiResponse(200, videos, "Videos fetched successfully"))
-    }
-    else{
-        const videos = await Video.aggregate([
-            {
-                $match:{
-                    title:{$regex: query, $options: 'i' },
-                    description:{$regex: query, $options: "i"},
-                    owner: new mongoose.Types.ObjectId(userId)
-                }
-            },
-            {
-                $sort:{
-                    [sortBy]: sortType=='ascending'?1:-1
-                }
-            },
-            {
-                $skip:(page-1)*10
-            },
-            {
-                $limit: parseInt(limit)
-            }
-        ])
-        if(!videos){
-            throw new ApiError(404, "no videos found")
+    page =  parseInt(page, 10)
+    limit = parseInt(limit, 10)
 
+    // Validate and adjust page and limit values
+
+    page = Math.max(1, page); // ensure that the lesat page is 1
+    limit = Math.min(20, MAth.max(1, limit));
+
+    const pipeline =[];
+
+    if(userId){
+        if(!isValidObjectId(userId)){
+            throw new ApiError(400, "userId is invalid")
         }
-        return res.status(200)
-        .json(
-            new ApiResponse(201,
-                {
-                  videos,
-                  length: videos.length,
-                  nextPage: parseInt(page)+1  
-                },
-                "videos fetched successfully"
-                )
-        )
-
     }
 
-})
+    pipeline.push({
+        $match:{
+            owner: mongoose.Types.ObjectId(userId)
+        }
+    });
+
+    // Matching videos based in the searched query
+    if(query){
+        pipeline.push({
+            $match:{
+                $text:{
+                    $search: query
+                }
+            }
+        });
+    }
+
+    // Sort Type and Sort By
+    const sortCriteria = {};
+    if(sortBy && sortType){
+        sortCriteria[sortBy] = sortType ==="asc"?1:-1
+        pipeline.push({
+            $sort: sortCriteria
+        })
+    }else{
+        // Default sorting by createdAt
+        sortCriteria["createdAt"]==-1;
+        pipeline.push({
+            $sort : sortCriteria
+        });
+    }
+
+    // Apply Pagination using skip and limit
+    pipeline.push({
+        $skip: (page-1)*limit
+    });
+    pipeline.push({
+        $limit: limit
+    });
+
+    const videos = await Video.aggregate(pipeline);
+
+    if(!videos || videos.length ===0){
+        throw new ApiError(404, "Videos not found")
+    }
+
+    return res.status(200)
+    .json(
+        new ApiResponse(200, videos, "Videos fetched Successfully")
+    )
+
+});
 
 export {
     publishAVideo,

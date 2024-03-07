@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 // import mongoose, { isValidObjectId } from "mongoose";
 import {Like} from '../models/like.model.js'
 import { Video } from "../models/video.model.js";
-import { isValidObjectId } from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 
 
 const toogleVideoLike = asyncHandler(async(req, res)=>{
@@ -138,10 +138,90 @@ const getLikedVideos = asyncHandler(async(req, res)=>{
     const {userId} = req.user?._id;
     try {
         
+        const likedVideos = await Like.aggregate([
+            {
+                $match:{
+                    likedBy : new mongoose.Types.ObjectId(userId)
+                }
+            },
+            {
+                $lookup:{
+                    from: "videos",
+                    localField: "videos",
+                    foreignField: "_id",
+                    as: "likedVideos"
+                }
+            },{
+                $unwind: "$likedVideos"
+            },{
+                $match:{
+                    "likedVideos.isPublished" : true
+                }
+            },
+            {
+                $lookup:{
+                    from: "users",
+                    let:{owner_id : "$likedVideos.owner"},
+                    pipeline:[
+                        {
+                            $match:{
+                                $expr: {$eq: ["$_id", "$$owner_id"]}
+                            }
+                        },{
+                            $project:{
+                                _id:0,
+                                username: 1,
+                                avatar:1,
+                                fullname:1
+                            }
+                        }
+                    ],
+                    as: "owner"
+                }
+            },
+            {
+                $unwind: {
+                    path: "$owner", preserveNullAndEmptyArrays
+                }
+            },
+            {
+                $project:{
+                    _id: "$likedVideos._id",
+                    title: "$likedVideos.title",
+                    thumbnail: '$likedVideos.thumbnail',
+                    owner:{
+                        username : "$owner.username",
+                        avatar:"$owner.avatar",
+                        fullName: "$owner.fullName"
+                    }
+                }
+            },
+            {
+                $group:{
+                    _id: null,
+                    likedVideos: {$push: "$$ROOT"}
+                }
+            },
+            {
+                $project:{
+                    _id :0,
+                    likedVideos:1
+                }
+            }
+        ]);
+        if(likedVideos.length ===0){
+            return res.status(400).json(
+                new ApiResponse(404, [], "no liked video found")
+            )
+        }
+
+        return res.status(200).json(
+            new ApiResponse(200,likedVideos, "Liked videos fetched successfully")
+        )
 
 
     } catch (error) {
-        
+        throw new ApiError(500, error?.message || "Unable to fetched videos")
     }
 
 })
